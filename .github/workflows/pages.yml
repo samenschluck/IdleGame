@@ -1,0 +1,41 @@
+name: Deploy to GitHub Pages
+
+# Kein Build-Step: das Repo wird 1:1 ausgeliefert. Nach jedem Push auf den
+# Entwicklungsbranch ist die neue Version ca. eine Minute später am Handy live.
+
+on:
+  push:
+    branches:
+      - main
+      - claude/idle-android-game-concept-tbh1iu
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Smoke-Test (Syntax aller Module)
+        run: node tools/check.mjs
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

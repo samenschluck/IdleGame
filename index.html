@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#12100e">
+  <meta name="description" content="Tiefenschacht — ein Idle-Mining-Game im Zwergen-Fantasy-Setting.">
+  <title>Tiefenschacht</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header id="hud">
+  <div class="hud-row">
+    <div class="res" id="res-gold"><span class="res-ico">🪙</span><span class="res-val">0</span></div>
+    <div class="res" id="res-crystals"><span class="res-ico">💎</span><span class="res-val">0</span></div>
+    <div class="res" id="res-runes"><span class="res-ico">ᚱ</span><span class="res-val">0</span></div>
+  </div>
+  <div class="hud-row hud-sub">
+    <span id="hud-layer">Oberboden</span>
+    <span id="hud-dps">0/s Grabkraft</span>
+  </div>
+  <div id="boost-bar" class="boost hidden">🔥 Adernstoß <span id="boost-time">0s</span></div>
+</header>
+
+<main id="views">
+
+  <!-- ── MINE ───────────────────────────────────────────────────────────── -->
+  <section class="view active" id="view-mine">
+    <div class="depth-strip">
+      <span class="depth-label">Tiefe</span>
+      <span class="depth-value" id="depth-value">0 m</span>
+      <span class="depth-max" id="depth-max">max 0 m</span>
+    </div>
+
+    <div class="shaft" id="shaft">
+      <button class="block" id="block" aria-label="Graben">
+        <span class="block-name" id="block-name">Oberboden</span>
+        <span class="block-face" id="block-face">🪨</span>
+        <span class="block-hp" id="block-hp">12 / 12</span>
+        <div class="hpbar"><div class="hpbar-fill" id="hpbar-fill"></div></div>
+      </button>
+      <div class="floaters" id="floaters" aria-hidden="true"></div>
+    </div>
+
+    <div class="quick-row">
+      <button class="quick" id="btn-freebie">
+        <span class="quick-ico">🎁</span>
+        <span class="quick-label">Geschenk</span>
+        <span class="quick-sub" id="freebie-sub">bereit</span>
+      </button>
+      <button class="quick" id="btn-bomb">
+        <span class="quick-ico">🧨</span>
+        <span class="quick-label">Geodenbombe</span>
+        <span class="quick-sub" id="bomb-sub">bereit</span>
+      </button>
+    </div>
+
+    <ul class="log" id="log"></ul>
+  </section>
+
+  <!-- ── ZWERGE ─────────────────────────────────────────────────────────── -->
+  <section class="view" id="view-crew">
+    <div class="buy-mode">
+      <span>Kaufmenge</span>
+      <div class="seg" id="buy-mode">
+        <button data-amount="1" class="active">×1</button>
+        <button data-amount="10">×10</button>
+        <button data-amount="max">Max</button>
+      </div>
+    </div>
+    <div class="cards" id="miner-list"></div>
+  </section>
+
+  <!-- ── SCHMIEDE ───────────────────────────────────────────────────────── -->
+  <section class="view" id="view-forge">
+    <div class="cards" id="forge-list"></div>
+  </section>
+
+  <!-- ── KRISTALLE ──────────────────────────────────────────────────────── -->
+  <section class="view" id="view-crystal">
+    <p class="section-note">
+      Kristalle findest du in Geoden, bei Wächtern und über Geschenke.
+      Je tiefer du kommst, desto großzügiger wird der Berg.
+    </p>
+    <h2 class="section-title">Sofort-Hilfen</h2>
+    <div class="cards" id="action-list"></div>
+    <h2 class="section-title">Dauerhaft</h2>
+    <div class="cards" id="crystal-list"></div>
+  </section>
+
+  <!-- ── TIEFE / PRESTIGE ───────────────────────────────────────────────── -->
+  <section class="view" id="view-deep">
+    <div class="prestige-card">
+      <h2>Einsturz</h2>
+      <p class="muted">
+        Der Schacht bricht zusammen. Gold, Zwerge und Schmiede sind weg —
+        aber die Seelen deiner Ahnen graben ab jetzt mit.
+      </p>
+      <div class="prestige-num"><span id="rune-gain">0</span> <span class="rune">ᚱ</span></div>
+      <div class="muted small" id="prestige-info">Mindestens 200 m nötig</div>
+      <button class="btn danger" id="btn-collapse" disabled>Schacht einstürzen lassen</button>
+    </div>
+
+    <h2 class="section-title">Schichten</h2>
+    <div class="layer-list" id="layer-list"></div>
+
+    <h2 class="section-title">Statistik</h2>
+    <div class="stats" id="stats"></div>
+
+    <h2 class="section-title">Speicherstand</h2>
+    <div class="save-row">
+      <button class="btn ghost" id="btn-export">Export</button>
+      <button class="btn ghost" id="btn-import">Import</button>
+      <button class="btn ghost danger-text" id="btn-wipe">Löschen</button>
+    </div>
+    <p class="muted small" id="version-line"></p>
+  </section>
+
+</main>
+
+<nav id="tabs">
+  <button class="tab active" data-view="mine"><span>⛏️</span>Mine</button>
+  <button class="tab" data-view="crew"><span>🧔</span>Zwerge</button>
+  <button class="tab" data-view="forge"><span>🔨</span>Schmiede</button>
+  <button class="tab" data-view="crystal"><span>💎</span>Kristalle</button>
+  <button class="tab" data-view="deep"><span>🕳️</span>Tiefe</button>
+</nav>
+
+<div class="modal hidden" id="modal">
+  <div class="modal-box">
+    <h2 id="modal-title">Titel</h2>
+    <div id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
