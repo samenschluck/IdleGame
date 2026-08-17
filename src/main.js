@@ -127,7 +127,9 @@ window.addEventListener('pagehide', () => save(state));
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {
+    // updateViaCache: 'none' — sonst darf der Browser sw.js selbst bis zu
+    // 24 h aus dem Cache bedienen und merkt eine neue Fassung gar nicht.
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {
       /* Ohne Service Worker läuft das Spiel trotzdem. */
     });
   });

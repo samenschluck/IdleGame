@@ -662,3 +662,5 @@ body {
 .level-cap { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .level-cap.capped { color: var(--danger); font-weight: 700; }
 .log li.level { color: #9db8ea; }
+
+.build { margin: 10px 2px 0; font-size: 10.5px; color: var(--muted); text-align: center; opacity: .7; }

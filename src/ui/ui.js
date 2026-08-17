@@ -13,6 +13,8 @@ import * as B from '../core/balance.js';
 import * as A from '../core/actions.js';
 import { exportSave, importSave } from '../core/state.js';
 
+const VERSION = 'Tiefenschacht v0.3 — Stufen, Erz, Härte, Schmelzofen';
+
 const $ = (id) => document.getElementById(id);
 
 const el = {};
@@ -37,7 +39,7 @@ export function initUI(gameState, handlers) {
     'pick-card', 'pick-section', 'ore-list', 'depot-section', 'smelter', 'smelter-section',
     'layer-list', 'stats', 'rune-gain', 'prestige-info', 'btn-collapse',
     'freebie-sub', 'bomb-sub', 'btn-freebie', 'btn-bomb', 'toast',
-    'modal', 'modal-title', 'modal-body', 'modal-actions', 'version-line',
+    'modal', 'modal-title', 'modal-body', 'modal-actions', 'version-line', 'build-line',
   ]) {
     el[id] = $(id);
   }
@@ -50,7 +52,11 @@ export function initUI(gameState, handlers) {
   bindPrestige();
   bindSaveRow();
 
-  el['version-line'].textContent = 'Tiefenschacht v0.3 — Stufen, Erz, Härte, Schmelzofen';
+  // Die Version gehört an eine Stelle, die man IMMER sieht. Im Prestige-Tab
+  // allein nützt sie nichts — der ist am Anfang gar nicht freigeschaltet, und
+  // genau dann will man wissen, ob überhaupt die neue Fassung geladen wurde.
+  el['version-line'].textContent = VERSION;
+  el['build-line'].textContent = VERSION;
   renderSlow();
 }
 

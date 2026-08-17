@@ -3,8 +3,16 @@
 // Bewusst NETWORK-FIRST: solange am Handy entwickelt wird, muss ein Reload
 // nach dem Push sofort die neue Version zeigen. Der Cache ist nur das
 // Sicherheitsnetz für Funkloch/Flugmodus.
+//
+// Wichtig dabei: `cache: 'no-cache'` beim fetch. Ohne das darf der Browser die
+// Anfrage aus seinem EIGENEN HTTP-Cache bedienen — "network-first" holt dann
+// zwar übers Netz, bekommt aber trotzdem die alte Datei. Mit 'no-cache' wird
+// immer beim Server rückgefragt (per ETag, kostet also fast nichts) und man
+// bekommt garantiert die aktuelle Fassung. Das gilt automatisch für alle
+// ES-Module — deshalb braucht keine Datei ein ?v=-Anhängsel, das man sonst bei
+// jedem Release an einem Dutzend Stellen nachziehen müsste.
 
-const CACHE = 'tiefenschacht-v1';
+const CACHE = 'tiefenschacht-v3';
 
 const PRECACHE = [
   './',
@@ -51,7 +59,7 @@ self.addEventListener('fetch', (event) => {
   if (new URL(request.url).origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(request)
+    fetch(request, { cache: 'no-cache' })
       .then((response) => {
         const copy = response.clone();
         caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
