@@ -15,19 +15,17 @@ weiterentwickeln — Änderung pushen, eine Minute warten, neu laden.
 
 ## Am Handy spielen
 
-Nach dem ersten Deploy liegt das Spiel hier:
+Das Spiel liegt hier — **der Pfad `/IdleGame/` gehört dazu**, `samenschluck.github.io`
+allein ist die Nutzer-Startseite und liefert einen 404:
 
 **https://samenschluck.github.io/IdleGame/**
 
-### GitHub Pages einmalig aktivieren
+Jeder Push auf `main` oder den Entwicklungsbranch veröffentlicht automatisch neu
+(siehe `.github/workflows/pages.yml`). Pages schaltet der Workflow beim ersten
+Lauf selbst frei (`enablement: true`).
 
-Muss einmal von Hand gemacht werden (geht auch am Handy in der GitHub-App
-oder im mobilen Browser):
-
-1. Repo → **Settings** → **Pages**
-2. Bei **Source**: **GitHub Actions** auswählen
-3. Fertig. Jeder Push auf `main` oder den Entwicklungsbranch veröffentlicht
-   automatisch neu (siehe `.github/workflows/pages.yml`).
+Falls das an einer Berechtigung scheitert, einmalig von Hand — geht auch in der
+GitHub-App: Repo → **Settings** → **Pages** → bei *Source* **GitHub Actions**.
 
 ### Als App auf den Startbildschirm
 

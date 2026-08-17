@@ -31,7 +31,11 @@ jobs:
       - name: Smoke-Test (Syntax aller Module)
         run: node tools/check.mjs
 
+      # enablement: true schaltet GitHub Pages beim ersten Lauf selbst frei —
+      # sonst müsste man es einmalig von Hand in den Repo-Einstellungen setzen.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
