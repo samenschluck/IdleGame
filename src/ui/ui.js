@@ -4,8 +4,9 @@
 
 import { fmt, fmtInt, fmtTime, fmtDepth } from '../util/format.js';
 import { MINERS } from '../data/miners.js';
-import { FORGE_UPGRADES, CRYSTAL_UPGRADES, CRYSTAL_ACTIONS } from '../data/upgrades.js';
-import { LAYERS, layerIndexAt, isBossDepth, bossNameAt } from '../data/layers.js';
+import { FORGE_UPGRADES, CRYSTAL_UPGRADES, CRYSTAL_ACTIONS, forgeMaxLevel } from '../data/upgrades.js';
+import { LAYERS, layerIndexAt, layerAt, isBossDepth, bossNameAt, ORE_BY_ID } from '../data/layers.js';
+import { PICKS, pickAt, nextPick } from '../data/picks.js';
 import * as B from '../core/balance.js';
 import * as A from '../core/actions.js';
 import { exportSave, importSave } from '../core/state.js';
@@ -18,15 +19,20 @@ let buyAmount = 1;
 let activeView = 'mine';
 let onTap = () => {};
 
+// Tabs, die erst mit ihrer Mechanik auftauchen.
+const TAB_FEATURE = { crystal: 'crystals', deep: 'prestige' };
+
 export function initUI(gameState, handlers) {
   state = gameState;
   onTap = handlers.onTap;
 
   for (const id of [
-    'res-gold', 'res-crystals', 'res-runes', 'hud-layer', 'hud-dps',
+    'res-gold', 'res-crystals', 'res-runes', 'hud-layer', 'hud-dps', 'hud-pick',
     'boost-bar', 'boost-time', 'depth-value', 'depth-max', 'block',
-    'block-name', 'block-face', 'block-hp', 'hpbar-fill', 'floaters',
+    'block-name', 'block-face', 'block-hp', 'block-vein', 'hpbar-fill', 'floaters',
+    'hardness-warn', 'hardness-text', 'mode-row', 'mode-seg', 'mode-hint', 'ore-strip',
     'log', 'miner-list', 'forge-list', 'crystal-list', 'action-list',
+    'pick-card', 'pick-section', 'ore-list', 'depot-section', 'smelter', 'smelter-section',
     'layer-list', 'stats', 'rune-gain', 'prestige-info', 'btn-collapse',
     'freebie-sub', 'bomb-sub', 'btn-freebie', 'btn-bomb', 'toast',
     'modal', 'modal-title', 'modal-body', 'modal-actions', 'version-line',
@@ -36,34 +42,32 @@ export function initUI(gameState, handlers) {
 
   bindTabs();
   bindBlock();
+  bindMode();
   bindLists();
   bindQuick();
   bindPrestige();
   bindSaveRow();
 
-  el['version-line'].textContent = 'Tiefenschacht v0.1 — Vertical Slice';
+  el['version-line'].textContent = 'Tiefenschacht v0.2 — Erz, Härte, Schmelzofen';
   renderSlow();
-}
-
-/** Zustandswechsel von außen (z.B. nach Import). */
-export function setState(next) {
-  state = next;
 }
 
 // ── Eingaben ────────────────────────────────────────────────────────────────
 
 function bindTabs() {
   document.querySelectorAll('.tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      activeView = tab.dataset.view;
-      document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
-      document.querySelectorAll('.view').forEach((v) => {
-        v.classList.toggle('active', v.id === 'view-' + activeView);
-      });
-      $('views').scrollTop = 0;
-      renderSlow();
-    });
+    tab.addEventListener('click', () => showView(tab.dataset.view));
   });
+}
+
+function showView(name) {
+  activeView = name;
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === name));
+  document.querySelectorAll('.view').forEach((v) => {
+    v.classList.toggle('active', v.id === 'view-' + name);
+  });
+  $('views').scrollTop = 0;
+  renderSlow();
 }
 
 function bindBlock() {
@@ -74,6 +78,16 @@ function bindBlock() {
     onTap({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   });
   el.block.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+function bindMode() {
+  el['mode-seg'].querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const res = A.setMode(state, btn.dataset.mode);
+      toast(res.msg, res.ok ? 'good' : 'bad');
+      renderSlow();
+    });
+  });
 }
 
 function bindLists() {
@@ -91,6 +105,7 @@ function bindLists() {
   delegate(el['forge-list'], (id) => A.buyForge(state, id, buyAmount === 'max' ? 'max' : buyAmount));
   delegate(el['crystal-list'], (id) => A.buyCrystalUpgrade(state, id));
   delegate(el['action-list'], (id) => A.useCrystalAction(state, id));
+  delegate(el['pick-card'], () => A.forgePick(state));
 }
 
 function delegate(container, run) {
@@ -121,9 +136,10 @@ function bindPrestige() {
     const gems = B.prestigeCrystals(state);
     showModal(
       'Schacht einstürzen lassen?',
-      `<p>Du verlierst Gold, Zwerge und alle Schmiede-Upgrades.</p>
+      `<p>Du verlierst Gold, Zwerge, Erz, Barren, die Schmiede-Upgrades — und die Spitzhacke.</p>
        <div class="row"><span>Seelenrunen</span><b>+${fmtInt(gain)} ᚱ</b></div>
        <div class="row"><span>Kristalle</span><b>+${fmtInt(gems)} 💎</b></div>
+       <div class="row"><span>Neuer Bonus</span><b>×${fmt(B.runeMultiplier(state.runes + gain))}</b></div>
        <div class="row"><span>Neue Starttiefe</span><b>${fmtDepth(B.startDepth(state))}</b></div>`,
       [
         { label: 'Abbrechen', cls: 'ghost', run: hideModal },
@@ -134,7 +150,7 @@ function bindPrestige() {
             const res = A.collapse(state);
             toast(res.msg, res.ok ? 'good' : 'bad');
             hideModal();
-            renderSlow();
+            showView('mine');
           },
         },
       ]
@@ -190,7 +206,7 @@ function bindSaveRow() {
           label: 'Löschen',
           cls: 'danger',
           run: () => {
-            localStorage.removeItem('tiefenschacht.save.v1');
+            localStorage.removeItem('tiefenschacht.save.v2');
             location.reload();
           },
         },
@@ -202,15 +218,17 @@ function bindSaveRow() {
 // ── Schneller Render-Pfad ───────────────────────────────────────────────────
 
 export function renderFast(now = Date.now()) {
-  // Gold immer ganzzahlig zeigen — Nachkommastellen wirken auf einem
-  // Münzzähler wie ein Anzeigefehler.
-  el['res-gold'].querySelector('.res-val').textContent = fmt(Math.floor(state.gold));
+  el['res-gold'].querySelector('.res-val').textContent = fmt(state.gold);
   el['res-crystals'].querySelector('.res-val').textContent = fmtInt(state.crystals);
   el['res-runes'].querySelector('.res-val').textContent = fmtInt(state.runes);
+  el['res-crystals'].classList.toggle('hidden', !state.features.crystals);
+  el['res-runes'].classList.toggle('hidden', state.runes <= 0);
 
   const layer = LAYERS[layerIndexAt(state.depth)];
+  const pick = pickAt(state.pickTier);
   el['hud-layer'].textContent = layer.name;
-  el['hud-dps'].textContent = fmt(B.totalDps(state, now)) + '/s Grabkraft';
+  el['hud-pick'].textContent = `${pick.icon} ${pick.name}`;
+  el['hud-dps'].textContent = fmt(B.totalDps(state, now)) + '/s';
   document.documentElement.style.setProperty('--layer', layer.tint);
 
   const boostLeft = state.boostUntil - now;
@@ -220,8 +238,33 @@ export function renderFast(now = Date.now()) {
   el['depth-value'].textContent = fmtDepth(state.depth);
   el['depth-max'].textContent = 'max ' + fmtDepth(state.maxDepth);
 
-  const boss = isBossDepth(state.depth);
-  const max = B.blockMaxHp(state.depth);
+  renderBlock(layer);
+  renderHardness(layer, pick);
+  renderOreStrip(layer);
+
+  el['mode-row'].classList.toggle('hidden', !state.features.farmMode);
+  el['mode-seg'].querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === state.mode);
+  });
+  el['mode-hint'].textContent =
+    state.mode === 'farm'
+      ? `Du bleibst auf ${fmtDepth(state.depth)} und holst ${B.FARM_ORE_BONUS()}× Erz heraus.`
+      : 'Es geht abwärts — jeder Block ein Meter.';
+
+  updateQuick(el['btn-freebie'], el['freebie-sub'], state.freebieReadyAt, now,
+    `+${fmtInt(B.freebieYield(state))} 💎`);
+  updateQuick(el['btn-bomb'], el['bomb-sub'], state.bombReadyAt, now,
+    `+${fmtInt(B.bombYield(state))} 💎`);
+
+  for (const [view, feature] of Object.entries(TAB_FEATURE)) {
+    const tab = document.querySelector(`.tab[data-view="${view}"]`);
+    if (tab) tab.classList.toggle('hidden', !state.features[feature]);
+  }
+}
+
+function renderBlock(layer) {
+  const boss = isBossDepth(state.depth) && !state.bossesDown[state.depth];
+  const max = B.blockMaxHp(state.depth, boss);
   const pct = Math.max(0, Math.min(1, state.blockHp / max));
   el['hpbar-fill'].style.width = (pct * 100).toFixed(1) + '%';
   el.block.classList.toggle('boss', boss);
@@ -229,10 +272,43 @@ export function renderFast(now = Date.now()) {
   el['block-face'].textContent = boss ? '👁️' : blockFace(layer.id);
   el['block-hp'].textContent = `${fmt(Math.max(0, state.blockHp))} / ${fmt(max)}`;
 
-  updateQuick(el['btn-freebie'], el['freebie-sub'], state.freebieReadyAt, now,
-    `+${fmtInt(B.freebieYield(state))} 💎`);
-  updateQuick(el['btn-bomb'], el['bomb-sub'], state.bombReadyAt, now,
-    `+${fmtInt(B.bombYield(state))} 💎`);
+  const vein = B.VEINS[state.vein];
+  const special = vein && vein.mult > 1;
+  el['block-vein'].classList.toggle('hidden', !special);
+  el.block.classList.toggle('vein', !!special);
+  if (special) el['block-vein'].textContent = `${vein.icon} ${vein.name} · ${vein.mult}× Erz`;
+}
+
+function renderHardness(layer, pick) {
+  const short = B.hardnessShortfall(state);
+  el['hardness-warn'].classList.toggle('hidden', short <= 0);
+  if (short <= 0) return;
+  const pct = (B.hardnessFactor(state) * 100).toFixed(short > 1 ? 1 : 0);
+  el['hardness-text'].innerHTML =
+    `<b>${layer.name}</b> hat Härte ${layer.hardness}, deine ${pick.name} schafft ${pick.power}. ` +
+    `Du richtest nur <b>${pct} %</b> aus — schmiede eine bessere Hacke.`;
+}
+
+function renderOreStrip(layer) {
+  if (!state.features.forge) {
+    el['ore-strip'].classList.add('hidden');
+    return;
+  }
+  el['ore-strip'].classList.remove('hidden');
+  const cap = B.depotCap(state);
+  const ore = layer.ore;
+  const have = state.ores[ore.id] || 0;
+  const full = have >= cap;
+  el['ore-strip'].innerHTML =
+    `<div class="ore-chip ${full ? 'full' : ''}">
+       <span>${ore.icon}</span>
+       <span class="ore-name">${ore.name}</span>
+       <span class="ore-amount">${fmtInt(have)} / ${fmtInt(cap)}</span>
+     </div>` +
+    (state.features.smelter
+      ? `<div class="ore-chip"><span>🔩</span><span class="ore-name">Barren</span>
+           <span class="ore-amount">${fmtInt(state.bars)} · ×${B.barMultiplier(state).toFixed(2)}</span></div>`
+      : '');
 }
 
 function updateQuick(btn, sub, readyAt, now, readyText) {
@@ -256,31 +332,32 @@ function blockFace(id) {
 export function renderSlow() {
   renderLog();
   if (activeView === 'crew') renderMiners();
-  else if (activeView === 'forge') renderForge();
+  else if (activeView === 'forge') renderForgeView();
   else if (activeView === 'crystal') renderCrystals();
   else if (activeView === 'deep') renderDeep();
 }
 
 function renderLog() {
   const items = state.log.slice(-14).reverse();
-  el.log.innerHTML = items
-    .map((e) => `<li class="${e.kind}">${escapeHtml(e.text)}</li>`)
-    .join('') || '<li>Der Stollen wartet.</li>';
+  el.log.innerHTML =
+    items.map((e) => `<li class="${e.kind}">${escapeHtml(e.text)}</li>`).join('') ||
+    '<li>Der Stollen wartet.</li>';
 }
 
 function renderMiners() {
   el['miner-list'].innerHTML = MINERS.map((m) => {
     const owned = state.miners[m.id] || 0;
-    const locked = state.maxDepth < m.unlockDepth;
+    const locked = state.pickTier < m.unlockPick;
     if (locked && owned === 0) {
       return card({
-        id: m.id, icon: '🔒', title: '???', desc: `Freigeschaltet ab ${fmtDepth(m.unlockDepth)}`,
+        id: m.id, icon: '🔒', title: '???',
+        desc: `Freigeschaltet mit der ${pickAt(m.unlockPick).name}`,
         cost: '', disabled: true, cls: 'locked',
       });
     }
     const n = buyAmount === 'max' ? Math.max(1, B.maxAffordable(m, owned, state.gold)) : buyAmount;
     const cost = B.minerCostBulk(m, owned, n);
-    const affordable = cost <= state.gold;
+    const affordable = cost <= state.gold && !locked;
     return card({
       id: m.id,
       icon: m.icon,
@@ -294,21 +371,112 @@ function renderMiners() {
   }).join('');
 }
 
-function renderForge() {
-  el['forge-list'].innerHTML = FORGE_UPGRADES.map((u) => {
+function renderForgeView() {
+  renderPickCard();
+  renderDepot();
+  renderSmelter();
+  renderForgeUpgrades();
+}
+
+function renderPickCard() {
+  const current = pickAt(state.pickTier);
+  const next = nextPick(state.pickTier);
+  const layer = layerAt(state.depth);
+
+  if (!next) {
+    el['pick-card'].innerHTML = `<div class="pick-done">
+      <div class="pick-now">${current.icon} ${current.name}</div>
+      <p class="muted small">Die beste Hacke, die je geschmiedet wurde. Tiefer geht nur noch mit Runen.</p>
+    </div>`;
+    return;
+  }
+
+  const ore = ORE_BY_ID[next.ore];
+  const have = state.ores[next.ore] || 0;
+  const oreOk = have >= next.oreAmount;
+  const goldOk = state.gold >= next.gold;
+  const pct = Math.min(100, (have / next.oreAmount) * 100);
+
+  el['pick-card'].innerHTML = `
+    <div class="pick-now">Aktuell: ${current.icon} ${current.name} · Schlagkraft ${current.power}</div>
+    <button class="pick-next ${oreOk && goldOk ? 'ready' : ''}" data-id="forge"
+            ${oreOk && goldOk ? '' : 'disabled'}>
+      <div class="pick-head">
+        <span class="pick-icon">${next.icon}</span>
+        <span>
+          <span class="pick-name">${next.name}</span>
+          <span class="pick-power">Schlagkraft ${next.power} — bricht Härte ${next.power}</span>
+        </span>
+      </div>
+      <div class="pick-need ${oreOk ? 'ok' : ''}">
+        ${ore.icon} ${fmtInt(have)} / ${fmtInt(next.oreAmount)} ${ore.name}
+      </div>
+      <div class="pick-bar"><div class="pick-bar-fill" style="width:${pct}%"></div></div>
+      <div class="pick-need ${goldOk ? 'ok' : ''}">🪙 ${fmt(next.gold)}</div>
+    </button>
+    ${
+      layer.hardness > current.power
+        ? `<p class="muted small">Hier unten hilft nur diese Hacke weiter.</p>`
+        : `<p class="muted small">Reicht noch. Brauchst du erst für Härte ${next.power}.</p>`
+    }`;
+}
+
+function renderDepot() {
+  const show = state.features.forge;
+  el['depot-section'].classList.toggle('hidden', !show);
+  if (!show) return;
+
+  const cap = B.depotCap(state);
+  const rows = LAYERS.filter((l) => (state.ores[l.ore.id] || 0) > 0 || state.seenLayers[l.id])
+    .map((l) => {
+      const have = state.ores[l.ore.id] || 0;
+      const pct = Math.min(100, (have / cap) * 100);
+      const full = have >= cap;
+      return `<div class="ore-row ${full ? 'full' : ''}">
+        <span class="ore-ico">${l.ore.icon}</span>
+        <span class="ore-main">
+          <span class="ore-title">${l.ore.name}${full ? ' <b>voll</b>' : ''}</span>
+          <span class="ore-bar"><span class="ore-bar-fill" style="width:${pct}%"></span></span>
+        </span>
+        <span class="ore-num">${fmtInt(have)}<span class="cost-sub">/ ${fmtInt(cap)}</span></span>
+      </div>`;
+    });
+  el['ore-list'].innerHTML = rows.join('') || '<p class="muted small">Noch kein Erz gefördert.</p>';
+}
+
+function renderSmelter() {
+  const show = state.features.smelter;
+  el['smelter-section'].classList.toggle('hidden', !show);
+  if (!show) return;
+  el.smelter.innerHTML = `
+    <div class="smelter-body">
+      <div class="smelter-num">🔩 ${fmtInt(state.bars)} <span class="muted small">Barren</span></div>
+      <div class="muted small">
+        Frisst ${fmt(B.smeltRate(state))} Erz/s · ${B.ORE_PER_BAR} Erz je Barren<br>
+        Jeder Barren macht alles ${'×'}1,04 — aktuell <b>×${B.barMultiplier(state).toFixed(2)}</b>
+      </div>
+    </div>`;
+}
+
+function renderForgeUpgrades() {
+  el['forge-list'].innerHTML = FORGE_UPGRADES.filter(
+    (u) => !u.feature || state.features[u.feature]
+  ).map((u) => {
     const level = state.upgrades[u.id] || 0;
+    const cap = forgeMaxLevel(u, state);
     const maxed = level >= u.max;
-    const cost = maxed ? Infinity : B.forgeCost(u.id, level);
+    const gated = !maxed && level >= cap; // wartet auf eine bessere Hacke
+    const cost = maxed || gated ? Infinity : B.forgeCost(u.id, level);
     const affordable = cost <= state.gold;
     return card({
       id: u.id,
       icon: u.icon,
-      title: `${u.name} <span class="card-count">Stufe ${level}</span>`,
+      title: `${u.name} <span class="card-count">Stufe ${level}${cap < u.max ? ' / ' + cap : ''}</span>`,
       desc: u.desc,
-      effect: forgeEffect(u.id, level),
-      cost: maxed ? 'MAX' : `🪙 ${fmt(cost)}`,
-      disabled: maxed || !affordable,
-      cls: !maxed && affordable ? 'affordable' : '',
+      effect: gated ? 'Braucht eine bessere Spitzhacke' : forgeEffect(u.id, level),
+      cost: maxed ? 'MAX' : gated ? '🔒' : `🪙 ${fmt(cost)}`,
+      disabled: maxed || gated || !affordable,
+      cls: !maxed && !gated && affordable ? 'affordable' : '',
     });
   }).join('');
 }
@@ -321,6 +489,9 @@ function forgeEffect(id, level) {
     case 'lantern': return `Kritchance ${(B.critChance(state) * 100).toFixed(1)} %`;
     case 'powder': return `Kritschaden ×${B.critMultiplier(state).toFixed(1)}`;
     case 'survey': return `Geodenchance ${(B.geodeChance(state, state.depth) * 100).toFixed(2)} %`;
+    case 'sorting': return `${fmt(B.oreYield(state))} Erz pro Block`;
+    case 'depot': return `Lager fasst ${fmtInt(B.depotCap(state))} je Sorte`;
+    case 'furnace': return `${fmt(B.smeltRate(state))} Erz/s`;
     default: return '';
   }
 }
@@ -370,6 +541,7 @@ function renderDeep() {
     return `<div class="layer-row ${i === current ? 'current' : ''} ${seen ? '' : 'unseen'}">
       <span class="layer-dot" style="background:${l.tint}"></span>
       <span class="layer-name">${seen ? escapeHtml(l.name) : '???'}</span>
+      <span class="layer-hard">Härte ${l.hardness}</span>
       <span class="layer-depth">${range}</span>
     </div>`;
   }).join('');
@@ -377,10 +549,12 @@ function renderDeep() {
   const s = state.stats;
   el.stats.innerHTML = [
     ['Blöcke zerschlagen', fmtInt(s.blocksBroken)],
-    ['Schläge von Hand', fmtInt(s.taps)],
+    ['Erz gefördert', fmtInt(s.oreMined)],
+    ['Barren geschmolzen', fmtInt(s.barsSmelted)],
+    ['Adern getroffen', fmtInt(s.veins)],
+    ['Hacken geschmiedet', fmtInt(s.picksForged)],
     ['Wächter besiegt', fmtInt(s.bossesSlain)],
     ['Geoden gefunden', fmtInt(s.geodes)],
-    ['Gold gesamt', fmt(s.goldEarned)],
     ['Kristalle gesamt', fmtInt(s.crystalsEarned)],
     ['Einstürze', fmtInt(s.collapses)],
     ['Spielzeit', fmtTime(s.playtimeMs / 1000)],
@@ -426,6 +600,15 @@ function burstFloaters() {
   }
 }
 
+/** Neue Mechanik: die bekommt einen eigenen Auftritt, keinen Toast nebenbei. */
+export function announceFeature(feature) {
+  showModal(
+    `${feature.icon}  ${feature.name}`,
+    `<p>${escapeHtml(feature.unlockText)}</p>`,
+    [{ label: 'Verstanden', cls: 'danger', run: hideModal }]
+  );
+}
+
 let toastTimer;
 export function toast(msg, kind = '') {
   el.toast.textContent = msg;
@@ -457,3 +640,5 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
   );
 }
+
+export { PICKS };

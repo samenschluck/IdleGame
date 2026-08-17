@@ -178,84 +178,132 @@ src/
 Balance ist bewusst in `core/balance.js` und `data/*` isoliert: Zahlen drehen,
 ohne Spiel-Logik anzufassen.
 
-## 10. Gemessene Fortschrittskurve
+## 10. Warum das Spiel bremst (v0.2)
 
-Aus `node tools/check.mjs` (simulierter Spieler, tippt die ersten 5 Minuten mit,
-kauft danach was bezahlbar ist):
+Die erste Fassung war in zehn Minuten durchgespielt. Der Grund war strukturell,
+nicht numerisch: **es gab genau einen Engpass.** Gold pro Block wächst
+exponentiell mit der Tiefe, ein Zwerg kostet aber nur nach Anzahl mehr. Sobald
+das Einkommen die Kosten überholt, kauft man alles auf einmal. Zusätzlich
+schalteten sich Zwergenstufen über die *Tiefe* frei — mehr Tiefe gab also mehr
+Grabkraft gab mehr Tiefe. Eine Rückkopplung ohne Bremse. Am Ende stoppte nicht
+die Ökonomie, sondern dass die Zwergenliste leer war.
 
-| Zeitpunkt | Tiefe | Kristalle |
-|-----------|-------|-----------|
-| 1 min | 25 m | 2 💎 |
-| 10 min | 91 m | 7 💎 |
-| 30 min | 730 m | 834 💎 |
-| 4 h (Ende Lauf 1) | 812 m | 958 💎 |
+Seit v0.2 gibt es drei Achsen, die unabhängig blockieren:
 
-Prestige-Kette, danach je 1 Stunde pro Lauf:
+| Achse | Was sie ist | Warum sie nicht ausreißt |
+|-------|-------------|--------------------------|
+| **Härte** | Jede Schicht verlangt eine Mindest-Schlagkraft. Zu schwach = 25 % Schaden, zwei Stufen zu schwach = 6 %. | Gold hilft hier gar nicht. |
+| **Erz** | Fällt **pro Block**, nicht pro Meter — also linear statt exponentiell. Bezahlt die nächste Hacke. | Lässt sich nicht durch Tiefe abkürzen, nur durch Zeit im Stollen. |
+| **Gold** | Bleibt der Beschleuniger: mehr Zwerge, mehr Blöcke pro Sekunde. | Bringt keinen Meter Tiefe für sich allein. |
 
-| Lauf | Tiefe | Zuwachs | Runen |
-|------|-------|---------|-------|
-| 2 | 1 300 m | +488 m | 50 ᚱ |
-| 3 | 1 706 m | +406 m | 92 ᚱ |
-| 4 | 2 039 m | +333 m | 131 ᚱ |
-| 5 | 2 382 m | +343 m | 165 ᚱ |
-| 6 | 2 693 m | +311 m | 202 ᚱ |
-| 7 | 2 995 m | +302 m | 238 ᚱ |
+Daraus entsteht der Rhythmus, der vorher fehlte:
 
-Die Kette trägt also stabil ~300 m pro Lauf. Die Weltenwurzel (endlose Schicht)
-wird nach etwa sieben Läufen erreicht.
+```
+vortreiben → Wand → ausbeuten → Hacke schmieden → Durchbruch → vortreiben
+```
 
-### Die wichtigste Balancing-Lehre
+### Vier Regeln, die dabei nicht verhandelbar sind
 
-Der erste Entwurf hatte `Runenbonus = 1 + 0,08 · Runen^0,9`. Die Simulation
-zeigte: **ab Lauf 4 bringt Prestige praktisch nichts mehr** (+6 m, +2 m, dann
-Stillstand).
+Jede davon stammt aus einem gemessenen Fehlverhalten, nicht aus dem Bauchgefühl —
+und jede ist im Test festgenagelt.
 
-Der Grund ist strukturell, nicht kosmetisch:
+**1. Die Hacke für Härte N besteht aus dem Erz der Schicht mit Härte N.**
+Im Schacht geht es nicht zurück nach oben. Bräuchte die Hacke das Erz der
+*vorigen* Schicht, wäre ein Lauf unrettbar tot, sobald man eine Schicht
+durchquert hat, ohne genug zu sammeln. Gemessen: der Bot klebte 47 Stunden auf
+60 m fest.
 
-- Blockhärte wächst **exponentiell** mit der Tiefe (`1,055^Tiefe`).
-- Kaufbare Grabkraft wächst nur **linear** mit der Tiefe. Zwerge kosten
-  `×1,15` pro Einheit, also geht Gold nur *logarithmisch* in die Grabkraft ein —
-  und Gold selbst wächst exponentiell mit der Tiefe. Exponentiell + logarithmisch
-  = linear.
+**2. Der Schmelzofen rührt das Erz für die nächste Hacke nicht an.**
+Ein ausgebauter Ofen frisst den Nachschub schneller weg, als er hereinkommt.
+Gemessen: 208 Mio. Erz abgebaut, 1,7 Mio. Barren daraus — und nie die 1800
+Amethyst für den Durchbruch beisammen.
 
-Ein polynomialer Bonus verliert gegen einen exponentiellen Gegner immer. Der
-Runenbonus muss deshalb selbst exponentiell sein: `1,25^Runen`.
+**3. Die Werkstatt ist nur so gut wie die Hacke** (`perPick` in `upgrades.js`).
+Ohne diese Klammer kauft man den Baum in der ersten Stunde leer: die Grabkraft
+wuchs in den frühen Schichten um das 432-, 63- und 212-fache, die Blockhärte nur
+um das 26-fache. Fünf Schichten fielen binnen einer Stunde.
 
-Konsequenz fürs Weiterentwickeln: **jede neue Fortschrittsquelle muss auf ihre
-Wachstumsklasse geprüft werden, nicht auf ihren Zahlenwert.** `check.mjs` lässt
-den Test fehlschlagen, sobald ein Lauf der Kette auf null Fortschritt fällt.
+**4. Ein Wächter zählt nur beim ersten Mal.**
+Die Härtewand liegt zwangsläufig auf einer Schichtgrenze, und genau dort sitzt
+der Wächter. Wer dort ausbeutet, erschlüge ihn sonst endlos. Gemessen: 213 954
+Kristalle aus 12 355 Blöcken plus dauerhaft 30-facher Goldertrag.
 
-### Offene Balancing-Punkte
+### Gemessene Kurve
 
-- Zwischen Minute 10 und 30 beschleunigt der erste Lauf sehr abrupt
-  (91 m → 730 m), weil in dieser Phase mehrere Zwergenstufen gleichzeitig
-  freischalten. Freischalttiefen entzerren.
-- Danach steht der erste Lauf 3,5 Stunden praktisch still. Das ist der
-  klassische "Sprint gegen die Wand" — funktioniert, weil Prestige greift,
-  könnte aber mit Zwischenzielen (Quests, Relikte) angenehmer werden.
+`node tools/tune.mjs` — simulierter Spieler, erster Lauf, ohne Runen:
 
-## 11. Roadmap
+| Schicht | erreicht nach |
+|---------|---------------|
+| Kalkbank | 2 min |
+| Tiefengestein | 32 min |
+| Kristallhöhlen | 54 min |
+| Zwergenhallen | 1,4 h |
+| Trollklüfte | 2,4 h |
+| Vulkanschlund | 6,0 h |
+| Schattenreich | 19 h |
+| Höllenschlund | 61 h |
+| Weltenwurzel | **nicht im ersten Lauf** |
 
-**v0.1 — Vertical Slice (steht)**
-Graben, Zwerge, Schmiede, 10 Schichten, Wächter, Kristalle, Prestige,
-Offline, PWA, Pages-Deploy.
+Die ersten drei Schichten sind bewusst schnell — sie sind das Tutorial und
+zeigen Wand, Ausbeuten und Schmiede je einmal. Danach etwa Verdopplung bis
+Verdreifachung je Schicht. Die letzten Schichten gibt es nur über Prestige;
+der zweite Lauf schafft dieselbe Strecke bis Tiefengestein statt in 32 Minuten
+in unter einer.
 
-**v0.2 — Tiefe geben**
-- Erz-Inventar mit sichtbaren Fundstücken statt nur Gold
-- Relikte (Kristall-Gacha) mit passiven Effekten
-- Tagesquests
-- Zahlen-Balancing über echte Spieldaten
+### Werkzeuge
 
-**v0.3 — Fraktionen**
-- Zwergenhallen: NPC-Handelsposten
-- Trolle: Bedrohungs-Mechanik (Kämpfe zurück, Ausrüstung nötig)
-- Höllenschlund: Pakt-System mit Risiko/Ertrag
+```
+node tools/check.mjs                    Smoke-Test + Leitplanken (läuft in CI)
+node tools/tune.mjs                     Kurve gegen die Zielkurve prüfen
+node tools/tune.mjs oreGrowth 3 5 7     eine Stellschraube durchsweepen
+HOURS=200 node tools/tune.mjs           längeren Horizont simulieren
+```
 
-**v0.4 — App**
-- Capacitor-Wrapper, Icons, Splash
-- Play-Store-Testtrack
+Stellschrauben stehen in `balance.TUNING` und `picks.PICK_TUNING`. Der Test
+prüft die Kurve **beidseitig** — zu schnell schlägt genauso fehl wie zu langsam.
+Die erste Fassung war in zehn Minuten durch, ohne dass ein Test angeschlagen
+hätte; das soll nicht noch einmal passieren.
 
-**Offene Fragen (bewusst noch nicht entschieden)**
-- Sollen Trolle echte Kämpfe sein oder nur "härteres Gestein mit Namen"?
-- Mehrere Schächte parallel (Obelisk-Miner-Stil) oder ein Schacht in die Tiefe?
-- Erz als eigene Ressource zum Craften, oder bleibt Gold die einzige Wirtschaft?
+## 11. Mechaniken aus dem Obelisk-Miner-Wiki
+
+Das Wiki listet den Inhalt in drei Gruppen. Hier der Abgleich mit dem, was
+Tiefenschacht schon hat und was noch fehlt.
+
+### Steht (v0.2)
+
+| Obelisk Miner | Tiefenschacht |
+|---------------|---------------|
+| Ores | Erz je Schicht, Lager mit Kapazität |
+| Veins | Reiche Ader (6×) und Hauptader (25×) |
+| Craft / Bars | Schmelzofen: Erz → Barren → Grabkraft |
+| Floors | Zehn Schichten mit eigener Härte |
+| Obelisk | Wächter am Ende jeder Schicht |
+| Upgrades | Schmiede, an die Hackenstufe gekoppelt |
+| Sell | Gold pro Block |
+| Bombs | Sprengung (10 Blöcke) |
+| Offline | Echte Simulation statt Schätzung |
+| Prestige | Einsturz mit Seelenrunen |
+
+### Als Nächstes — jede Mechanik löst einen bestimmten Engpass
+
+Reihenfolge nach Nutzen, nicht nach Aufwand:
+
+1. **Contracts (Verträge)** — "Bring 500 Kupfer" gegen Kristalle. Gibt dem
+   Ausbeuten an der Wand ein zweites Ziel, damit Warten sich nach Aufgabe
+   anfühlt.
+2. **Chests + Relics (Truhen und Relikte)** — Wächter lassen Truhen fallen,
+   darin permanente Passiv-Boni. Der Grund, Wächter zu *wollen*.
+3. **Drones (Drohnen)** — Automatisierung: Ausbeuten ohne Zuschauen, Auto-Kauf.
+   Nimmt dem Spätspiel die Klickarbeit.
+4. **Skill-Tree** — ersetzt den flachen Runen-Multiplikator durch Entscheidungen.
+   Macht Prestige zur Wahl statt zur Rechenaufgabe.
+5. **Challenges (Herausforderungen)** — Läufe mit Handicap für permanente Boni.
+   Inhalt für alle, die die Kurve ausgereizt haben.
+6. **Lootbugs / Lootfrogs** — seltene Kreaturen, die durch den Stollen huschen
+   und angetippt werden wollen. Belohnt Hinschauen, ohne es zu erzwingen.
+7. **Pets, Cards, Workshop, Construct** — Sammel- und Set-Systeme fürs Spätspiel.
+8. **Stargazing, Archaeology, Fishing, Arcanist** — eigene Nebenaktivitäten,
+   sinnvoll erst wenn der Hauptloop über Wochen trägt.
+
+Nicht übernommen: **Store** und **Codes** (keine Monetarisierung geplant) sowie
+**Cloud** (der Speicherstand wandert per Export/Import, ohne Konto).

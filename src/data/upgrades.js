@@ -1,3 +1,11 @@
+// perPick: wie viele Stufen je Spitzhacken-Stufe freigeschaltet sind.
+//
+// Ohne diese Klammer kauft man den gesamten Baum in der ersten Stunde leer.
+// Gemessen: die Grabkraft wuchs in den fruehen Schichten um das 432-, 63- und
+// 212-fache, waehrend die Blockhaerte nur um das 26-fache stieg — die ersten
+// fuenf Schichten fielen dadurch binnen einer Stunde. Mit der Klammer waechst
+// die Werkstatt im Takt der Hacke mit, statt ihr davonzulaufen.
+//
 // Zwei Upgrade-Familien:
 //   FORGE_UPGRADES   — Gold, gehen beim Einsturz (Prestige) verloren
 //   CRYSTAL_UPGRADES — Kristalle, permanent
@@ -11,24 +19,27 @@ export const FORGE_UPGRADES = [
     name: 'Spitzhacke',
     icon: '⛏️',
     desc: 'Tippschaden ×1,25 pro Stufe',
-    max: 200,
-    cost: (l) => 20 * Math.pow(1.32, l),
+    max: 50,
+    cost: (l) => 20 * Math.pow(1.45, l),
+    perPick: 6,
   },
   {
     id: 'gear',
     name: 'Ausrüstung',
     icon: '🦺',
     desc: 'Grabkraft aller Zwerge ×1,12 pro Stufe',
-    max: 200,
-    cost: (l) => 180 * Math.pow(1.27, l),
+    max: 50,
+    cost: (l) => 180 * Math.pow(1.42, l),
+    perPick: 6,
   },
   {
     id: 'carts',
     name: 'Loren',
     icon: '🛒',
     desc: 'Gold pro Block ×1,15 pro Stufe',
-    max: 200,
-    cost: (l) => 120 * Math.pow(1.3, l),
+    max: 40,
+    cost: (l) => 120 * Math.pow(1.5, l),
+    perPick: 5,
   },
   {
     id: 'lantern',
@@ -37,22 +48,55 @@ export const FORGE_UPGRADES = [
     desc: '+1,5 % Kritchance beim Tippen (max 60 %)',
     max: 40,
     cost: (l) => 500 * Math.pow(1.45, l),
+    perPick: 5,
   },
   {
     id: 'powder',
     name: 'Schwarzpulver',
     icon: '💣',
     desc: 'Kritschaden +50 % pro Stufe',
-    max: 60,
+    max: 40,
     cost: (l) => 900 * Math.pow(1.5, l),
+    perPick: 5,
   },
   {
     id: 'survey',
     name: 'Geologie-Kunde',
     icon: '🔍',
-    desc: 'Geodenchance +12 % (relativ) pro Stufe',
-    max: 30,
+    desc: 'Geodenchance +5 % (relativ) pro Stufe',
+    max: 25,
     cost: (l) => 2_500 * Math.pow(1.6, l),
+    perPick: 3,
+  },
+  {
+    id: 'sorting',
+    name: 'Erzwäsche',
+    icon: '🪣',
+    desc: 'Erz pro Block +25 % pro Stufe',
+    max: 40,
+    cost: (l) => 400 * Math.pow(1.7, l),
+    feature: 'forge',
+    perPick: 5,
+  },
+  {
+    id: 'depot',
+    name: 'Erzlager',
+    icon: '📦',
+    desc: 'Fassungsvermögen ×2,2 pro Stufe',
+    max: 20,
+    cost: (l) => 1_200 * Math.pow(2.8, l),
+    feature: 'depot',
+    perPick: 3,
+  },
+  {
+    id: 'furnace',
+    name: 'Blasebalg',
+    icon: '🏭',
+    desc: 'Schmelztempo ×1,9 pro Stufe',
+    max: 20,
+    cost: (l) => 25_000 * Math.pow(2.8, l),
+    feature: 'smelter',
+    perPick: 3,
   },
 ];
 
@@ -63,7 +107,7 @@ export const CRYSTAL_UPGRADES = [
     icon: '💠',
     desc: 'Geodenchance +25 % (relativ) pro Stufe',
     max: 20,
-    cost: (l) => Math.floor(25 + 18 * Math.pow(l, 1.7)),
+    cost: (l) => Math.floor(120 + 90 * Math.pow(l, 2.1)),
   },
   {
     id: 'yield',
@@ -71,7 +115,7 @@ export const CRYSTAL_UPGRADES = [
     icon: '💎',
     desc: '+1 Kristall pro Geode',
     max: 25,
-    cost: (l) => Math.floor(40 + 30 * Math.pow(l, 1.8)),
+    cost: (l) => Math.floor(200 + 150 * Math.pow(l, 2.2)),
   },
   {
     id: 'offline',
@@ -79,7 +123,7 @@ export const CRYSTAL_UPGRADES = [
     icon: '🌙',
     desc: '+2 h Offline-Kapazität (Basis 8 h)',
     max: 8,
-    cost: (l) => Math.floor(60 + 55 * Math.pow(l, 1.9)),
+    cost: (l) => Math.floor(300 + 280 * Math.pow(l, 2.3)),
   },
   {
     id: 'runeboost',
@@ -87,7 +131,7 @@ export const CRYSTAL_UPGRADES = [
     icon: 'ᚱ',
     desc: '+10 % Seelenrunen beim Einsturz',
     max: 25,
-    cost: (l) => Math.floor(80 + 60 * Math.pow(l, 1.85)),
+    cost: (l) => Math.floor(400 + 320 * Math.pow(l, 2.25)),
   },
   {
     id: 'headstart',
@@ -95,7 +139,7 @@ export const CRYSTAL_UPGRADES = [
     icon: '🕳️',
     desc: 'Start nach dem Einsturz +25 m tiefer',
     max: 40,
-    cost: (l) => Math.floor(50 + 40 * Math.pow(l, 1.75)),
+    cost: (l) => Math.floor(250 + 200 * Math.pow(l, 2.15)),
   },
   {
     id: 'foresight',
@@ -103,9 +147,15 @@ export const CRYSTAL_UPGRADES = [
     icon: '⚡',
     desc: 'Dauerhaft +5 % Grabkraft pro Stufe',
     max: 40,
-    cost: (l) => Math.floor(70 + 45 * Math.pow(l, 1.8)),
+    cost: (l) => Math.floor(350 + 240 * Math.pow(l, 2.2)),
   },
 ];
+
+/** Wie weit dieses Upgrade mit der aktuellen Hacke ausgebaut werden darf. */
+export function forgeMaxLevel(def, state) {
+  if (!def.perPick) return def.max;
+  return Math.min(def.max, def.perPick * (state.pickTier || 1));
+}
 
 export const FORGE_BY_ID = Object.fromEntries(FORGE_UPGRADES.map((u) => [u.id, u]));
 export const CRYSTAL_BY_ID = Object.fromEntries(CRYSTAL_UPGRADES.map((u) => [u.id, u]));

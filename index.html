@@ -21,7 +21,8 @@
   </div>
   <div class="hud-row hud-sub">
     <span id="hud-layer">Oberboden</span>
-    <span id="hud-dps">0/s Grabkraft</span>
+    <span id="hud-pick">⛏️ Rostige Hacke</span>
+    <span id="hud-dps">0/s</span>
   </div>
   <div id="boost-bar" class="boost hidden">🔥 Adernstoß <span id="boost-time">0s</span></div>
 </header>
@@ -39,12 +40,28 @@
     <div class="shaft" id="shaft">
       <button class="block" id="block" aria-label="Graben">
         <span class="block-name" id="block-name">Oberboden</span>
+        <span class="block-vein hidden" id="block-vein">✨ Reiche Ader</span>
         <span class="block-face" id="block-face">🪨</span>
-        <span class="block-hp" id="block-hp">12 / 12</span>
+        <span class="block-hp" id="block-hp">10 / 10</span>
         <div class="hpbar"><div class="hpbar-fill" id="hpbar-fill"></div></div>
       </button>
       <div class="floaters" id="floaters" aria-hidden="true"></div>
     </div>
+
+    <div class="hardness hidden" id="hardness-warn">
+      <span class="hardness-ico">🪨</span>
+      <span id="hardness-text">Zu hartes Gestein</span>
+    </div>
+
+    <div class="mode-row hidden" id="mode-row">
+      <div class="seg wide" id="mode-seg">
+        <button data-mode="dig" class="active">⛏️ Vortrieb</button>
+        <button data-mode="farm">🔁 Ausbeuten</button>
+      </div>
+      <p class="mode-hint muted small" id="mode-hint">Es geht abwärts — jeder Block ein Meter.</p>
+    </div>
+
+    <div class="ore-strip" id="ore-strip"></div>
 
     <div class="quick-row">
       <button class="quick" id="btn-freebie">
@@ -77,6 +94,22 @@
 
   <!-- ── SCHMIEDE ───────────────────────────────────────────────────────── -->
   <section class="view" id="view-forge">
+    <div id="pick-section">
+      <h2 class="section-title">Spitzhacke</h2>
+      <div class="pick-card" id="pick-card"></div>
+    </div>
+
+    <div id="depot-section" class="hidden">
+      <h2 class="section-title">Erzlager</h2>
+      <div class="ore-list" id="ore-list"></div>
+    </div>
+
+    <div id="smelter-section" class="hidden">
+      <h2 class="section-title">Schmelzofen</h2>
+      <div class="smelter" id="smelter"></div>
+    </div>
+
+    <h2 class="section-title">Ausbau</h2>
     <div class="cards" id="forge-list"></div>
   </section>
 

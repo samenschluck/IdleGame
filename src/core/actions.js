@@ -17,14 +17,46 @@ import {
   PRESTIGE_MIN_DEPTH,
 } from './balance.js';
 import { MINERS_BY_ID } from '../data/miners.js';
-import { FORGE_BY_ID, CRYSTAL_BY_ID, CRYSTAL_ACTIONS } from '../data/upgrades.js';
+import { nextPick, pickAt } from '../data/picks.js';
+import { ORE_BY_ID } from '../data/layers.js';
+import { FORGE_BY_ID, CRYSTAL_BY_ID, CRYSTAL_ACTIONS, forgeMaxLevel } from '../data/upgrades.js';
 import { pushLog, simulateOffline } from './engine.js';
+
+/** Die nächste Spitzhacke schmieden — der eigentliche Durchbruch. */
+export function forgePick(state) {
+  const next = nextPick(state.pickTier);
+  if (!next) return fail('Es gibt keine bessere Hacke');
+
+  const have = state.ores[next.ore] || 0;
+  if (have < next.oreAmount) {
+    const missing = Math.ceil(next.oreAmount - have);
+    return fail(`Es fehlen ${missing} ${ORE_BY_ID[next.ore].name}`);
+  }
+  if (state.gold < next.gold) return fail('Zu wenig Gold');
+
+  state.ores[next.ore] = have - next.oreAmount;
+  state.gold -= next.gold;
+  state.pickTier = next.tier;
+  state.stats.picksForged++;
+  pushLog(state, `${next.name} geschmiedet — Schlagkraft ${next.power}`, 'forge');
+  return ok(`${next.name} geschmiedet`);
+}
+
+/** Vortreiben oder an Ort und Stelle ausbeuten. */
+export function setMode(state, mode) {
+  if (mode !== 'dig' && mode !== 'farm') return fail('Unbekannter Modus');
+  if (mode === 'farm' && !state.features.farmMode) return fail('Noch nicht freigeschaltet');
+  state.mode = mode;
+  return ok(mode === 'farm' ? 'Ausbeuten: Erz statt Tiefe' : 'Vortrieb: es geht abwärts');
+}
 
 /** amount: Zahl oder 'max' */
 export function buyMiner(state, id, amount = 1) {
   const miner = MINERS_BY_ID[id];
   if (!miner) return fail('Unbekannter Zwerg');
-  if (state.maxDepth < miner.unlockDepth) return fail('Noch nicht freigeschaltet');
+  if (state.pickTier < miner.unlockPick) {
+    return fail(`Erst ab ${pickAt(miner.unlockPick).name}`);
+  }
 
   const owned = state.miners[id] || 0;
   let n = amount === 'max' ? maxAffordable(miner, owned, state.gold) : amount;
@@ -45,8 +77,9 @@ export function buyForge(state, id, amount = 1) {
   let bought = 0;
   let level = state.upgrades[id] || 0;
   const limit = amount === 'max' ? 500 : amount;
+  const cap = forgeMaxLevel(def, state);
 
-  while (bought < limit && level < def.max) {
+  while (bought < limit && level < cap) {
     const cost = forgeCost(id, level);
     if (cost > state.gold) break;
     state.gold -= cost;
@@ -54,7 +87,9 @@ export function buyForge(state, id, amount = 1) {
     bought++;
   }
   if (bought === 0) {
-    return fail(level >= def.max ? 'Maximalstufe erreicht' : 'Zu wenig Gold');
+    if (level >= def.max) return fail('Maximalstufe erreicht');
+    if (level >= cap) return fail('Braucht erst eine bessere Spitzhacke');
+    return fail('Zu wenig Gold');
   }
   state.upgrades[id] = level;
   return ok(`${def.name} → Stufe ${level}`);
@@ -143,9 +178,17 @@ export function collapse(state) {
   state.stats.crystalsEarned += crystals;
   state.stats.collapses++;
 
+  // Der ganze Lauf geht: Gold, Zwerge, Schmiede, Erz, Barren und die Hacke.
+  // Die Runen machen den zweiten Durchgang so viel schneller, dass sich das
+  // Nachschmieden wie Fortschritt anfuehlt und nicht wie Strafe.
   state.gold = 0;
   state.miners = {};
   state.upgrades = {};
+  state.ores = {};
+  state.bars = 0;
+  state.pickTier = 1;
+  state.mode = 'dig';
+  state.bossesDown = {};
   state.blastBlocks = 0;
   state.depth = startDepth(state);
   state.blockHp = blockMaxHp(state.depth);

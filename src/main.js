@@ -28,7 +28,12 @@ function showOfflineModal(s) {
     ['Tiefer gegraben', fmtDepth(s.depth)],
     ['Gold', fmt(s.gold)],
   ];
+  if (s.ore > 0) rows.push(['Erz', fmtInt(s.ore)]);
+  if (s.bars > 0) rows.push(['Barren', fmtInt(s.bars) + ' 🔩']);
   if (s.crystals > 0) rows.push(['Kristalle', fmtInt(s.crystals) + ' 💎']);
+  if (s.oreWasted > 0) {
+    rows.push(['Liegengeblieben', fmtInt(s.oreWasted) + ' Erz — Lager voll']);
+  }
   const capNote = s.cappedFrom
     ? `<p class="small">Offline-Kapazität erreicht. Mehr Zeit gibt es über <b>Nachtschicht</b> im Kristall-Shop.</p>`
     : '';
@@ -83,13 +88,19 @@ function drainEvents() {
   if (!events.length) return;
   // Nur die letzten paar Ereignisse visualisieren — bei hoher Grabkraft
   // brechen pro Frame sonst hunderte Blöcke und die Floater ersticken das UI.
-  const recent = events.slice(-6);
+  // Freischaltungen dürfen nie unter den Tisch fallen — sie werden vor dem
+  // Kürzen herausgefiltert und bekommen einen eigenen Dialog.
+  const features = events.filter((e) => e.type === 'feature');
+  const recent = events.filter((e) => e.type !== 'feature').slice(-6);
   events.length = 0;
+
   for (const e of recent) {
     if (e.type === 'geode') UI.spawnFloater('+' + e.crystals + ' 💎', 'gem');
     else if (e.type === 'boss') UI.spawnFloater('⚔ ' + e.name, 'crit');
+    else if (e.type === 'vein') UI.spawnFloater(e.vein.icon + ' ' + e.vein.mult + '×', 'vein');
     else if (e.type === 'layer') UI.toast('Neue Schicht: ' + e.layer.name, 'good');
   }
+  if (features.length) UI.announceFeature(features[0].feature);
 }
 
 requestAnimationFrame(loop);
