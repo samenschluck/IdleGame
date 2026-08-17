@@ -42,6 +42,10 @@ export const TUNING = {
   bossHp: 20,
   bossGold: 30,
   endlessHpGrowth: 1.008, // pro Meter jenseits der letzten Schichtgrenze
+  xpBase: 26, // Erfahrung fuer die zweite Stufe
+  xpGrowth: 1.19, // Faktor je Stufe
+  levelCapBase: 15, // Stufenobergrenze ohne besiegten Waechter
+  levelCapPerBoss: 6, // … und je besiegtem Waechter
 };
 
 // ── Block-Härte & Ertrag ────────────────────────────────────────────────────
@@ -88,6 +92,58 @@ export function blockGold(state, depth, boss = isBossDepth(depth)) {
   let gold = baseHp(depth) * TUNING.goldShare;
   if (boss) gold *= TUNING.bossGold;
   return gold * goldMultiplier(state);
+}
+
+// ── Erfahrung und Stufe ─────────────────────────────────────────────────────
+//
+// Die eigentliche Fortschrittsspindel, dem Obelisk-Miner-Aufbau nachempfunden:
+//
+//   Blöcke brechen  →  Erfahrung  →  Stufe  →  Werkstatt-Ausbau freigeschaltet
+//                                      ↑
+//                            Obergrenze steigt NUR durch besiegte Wächter
+//
+// Das ist ein harter Riegel, den kein Grinden aufweicht — und es macht die
+// Wächter zu dem, was sie sein sollen: der Torwächter des Fortschritts, nicht
+// nur ein dicker Block. Zuvor haing der Werkstatt-Ausbau an der Hackenstufe
+// (`perPick`); das war eine Notloesung gegen den zu schnellen Aufkauf und
+// hatte keine eigene Spielhandlung dahinter.
+
+/** Erfahrung, die ein Block dieser Tiefe abwirft. */
+export function xpPerBlock(depth) {
+  return 1 + 2 * layerIndexAt(depth);
+}
+
+/** Gesamterfahrung, die fuer das Erreichen von `level` noetig ist. */
+export function xpForLevel(level) {
+  const g = TUNING.xpGrowth;
+  return level <= 1 ? 0 : (TUNING.xpBase * (Math.pow(g, level - 1) - 1)) / (g - 1);
+}
+
+/** Stufe aus der Gesamterfahrung — geschlossene Form, kein Suchen. */
+export function levelFromXp(xp, cap) {
+  if (xp <= 0) return 1;
+  const g = TUNING.xpGrowth;
+  const level = 1 + Math.log1p((xp * (g - 1)) / TUNING.xpBase) / Math.log(g);
+  return Math.max(1, Math.min(cap, Math.floor(level)));
+}
+
+/** Stufenobergrenze. Steigt ausschliesslich durch besiegte Wächter. */
+export function levelCap(state) {
+  return TUNING.levelCapBase + TUNING.levelCapPerBoss * (state.obelisk || 0);
+}
+
+export function playerLevel(state) {
+  return levelFromXp(state.xp || 0, levelCap(state));
+}
+
+/** Fortschritt zur naechsten Stufe, 0..1 — und ob die Obergrenze bremst. */
+export function levelProgress(state) {
+  const cap = levelCap(state);
+  const level = levelFromXp(state.xp || 0, cap);
+  if (level >= cap) return { level, cap, pct: 1, capped: true };
+  const from = xpForLevel(level);
+  const to = xpForLevel(level + 1);
+  return { level, cap, pct: Math.max(0, Math.min(1, ((state.xp || 0) - from) / (to - from))), capped: false };
 }
 
 // ── Härte: die Wand ─────────────────────────────────────────────────────────

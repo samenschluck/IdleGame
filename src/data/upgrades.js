@@ -1,10 +1,11 @@
-// perPick: wie viele Stufen je Spitzhacken-Stufe freigeschaltet sind.
+// unlockLevel: ab welcher Spielerstufe dieses Upgrade ueberhaupt auftaucht.
+// Die Ausbaustufe ist zusaetzlich durch die Spielerstufe gedeckelt, und die
+// Spielerstufe wiederum durch besiegte Waechter (siehe balance.levelCap).
 //
-// Ohne diese Klammer kauft man den gesamten Baum in der ersten Stunde leer.
+// Ohne so eine Klammer kauft man den gesamten Baum in der ersten Stunde leer.
 // Gemessen: die Grabkraft wuchs in den fruehen Schichten um das 432-, 63- und
 // 212-fache, waehrend die Blockhaerte nur um das 26-fache stieg — die ersten
-// fuenf Schichten fielen dadurch binnen einer Stunde. Mit der Klammer waechst
-// die Werkstatt im Takt der Hacke mit, statt ihr davonzulaufen.
+// fuenf Schichten fielen dadurch binnen einer Stunde.
 //
 // Zwei Upgrade-Familien:
 //   FORGE_UPGRADES   — Gold, gehen beim Einsturz (Prestige) verloren
@@ -21,7 +22,7 @@ export const FORGE_UPGRADES = [
     desc: 'Tippschaden ×1,25 pro Stufe',
     max: 50,
     cost: (l) => 20 * Math.pow(1.45, l),
-    perPick: 6,
+    unlockLevel: 1,
   },
   {
     id: 'gear',
@@ -30,7 +31,7 @@ export const FORGE_UPGRADES = [
     desc: 'Grabkraft aller Zwerge ×1,12 pro Stufe',
     max: 50,
     cost: (l) => 180 * Math.pow(1.42, l),
-    perPick: 6,
+    unlockLevel: 3,
   },
   {
     id: 'carts',
@@ -39,7 +40,7 @@ export const FORGE_UPGRADES = [
     desc: 'Gold pro Block ×1,15 pro Stufe',
     max: 40,
     cost: (l) => 120 * Math.pow(1.5, l),
-    perPick: 5,
+    unlockLevel: 6,
   },
   {
     id: 'lantern',
@@ -48,7 +49,7 @@ export const FORGE_UPGRADES = [
     desc: '+1,5 % Kritchance beim Tippen (max 60 %)',
     max: 40,
     cost: (l) => 500 * Math.pow(1.45, l),
-    perPick: 5,
+    unlockLevel: 10,
   },
   {
     id: 'powder',
@@ -57,7 +58,7 @@ export const FORGE_UPGRADES = [
     desc: 'Kritschaden +50 % pro Stufe',
     max: 40,
     cost: (l) => 900 * Math.pow(1.5, l),
-    perPick: 5,
+    unlockLevel: 14,
   },
   {
     id: 'survey',
@@ -66,7 +67,7 @@ export const FORGE_UPGRADES = [
     desc: 'Geodenchance +5 % (relativ) pro Stufe',
     max: 25,
     cost: (l) => 2_500 * Math.pow(1.6, l),
-    perPick: 3,
+    unlockLevel: 18,
   },
   {
     id: 'sorting',
@@ -76,7 +77,7 @@ export const FORGE_UPGRADES = [
     max: 40,
     cost: (l) => 400 * Math.pow(1.7, l),
     feature: 'forge',
-    perPick: 5,
+    unlockLevel: 8,
   },
   {
     id: 'depot',
@@ -86,7 +87,7 @@ export const FORGE_UPGRADES = [
     max: 20,
     cost: (l) => 1_200 * Math.pow(2.8, l),
     feature: 'depot',
-    perPick: 3,
+    unlockLevel: 12,
   },
   {
     id: 'furnace',
@@ -96,7 +97,7 @@ export const FORGE_UPGRADES = [
     max: 20,
     cost: (l) => 25_000 * Math.pow(2.8, l),
     feature: 'smelter',
-    perPick: 3,
+    unlockLevel: 16,
   },
 ];
 
@@ -151,10 +152,20 @@ export const CRYSTAL_UPGRADES = [
   },
 ];
 
-/** Wie weit dieses Upgrade mit der aktuellen Hacke ausgebaut werden darf. */
-export function forgeMaxLevel(def, state) {
-  if (!def.perPick) return def.max;
-  return Math.min(def.max, def.perPick * (state.pickTier || 1));
+/** Ist dieses Upgrade auf der aktuellen Spielerstufe schon sichtbar? */
+export function forgeUnlocked(def, level) {
+  return level >= (def.unlockLevel || 1);
+}
+
+/**
+ * Wie weit dieses Upgrade ausgebaut werden darf.
+ * Eine Stufe je Spielerstufe ab der Freischaltung — und die Spielerstufe
+ * haengt an den Waechtern, nicht an der verstrichenen Zeit.
+ */
+export function forgeMaxLevel(def, state, level) {
+  const lv = level ?? state.level ?? 1;
+  if (!forgeUnlocked(def, lv)) return 0;
+  return Math.min(def.max, 1 + (lv - (def.unlockLevel || 1)));
 }
 
 export const FORGE_BY_ID = Object.fromEntries(FORGE_UPGRADES.map((u) => [u.id, u]));

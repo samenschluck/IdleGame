@@ -264,46 +264,86 @@ prüft die Kurve **beidseitig** — zu schnell schlägt genauso fehl wie zu lang
 Die erste Fassung war in zehn Minuten durch, ohne dass ein Test angeschlagen
 hätte; das soll nicht noch einmal passieren.
 
-## 11. Mechaniken aus dem Obelisk-Miner-Wiki
+## 11. Die Fortschrittsspindel (v0.3)
 
-Das Wiki listet den Inhalt in drei Gruppen. Hier der Abgleich mit dem, was
-Tiefenschacht schon hat und was noch fehlt.
+Aus dem vollständigen Wiki kam die eine Struktur, die vorher fehlte. Bei
+Obelisk Miner treibt nicht die Tiefe den Fortschritt, sondern eine Kette:
 
-### Steht (v0.2)
+```
+Blöcke brechen → Erfahrung → Spielerstufe → Upgrades freigeschaltet
+                                  ↑
+                    Obergrenze steigt NUR durch besiegte Wächter
+```
 
-| Obelisk Miner | Tiefenschacht |
-|---------------|---------------|
-| Ores | Erz je Schicht, Lager mit Kapazität |
-| Veins | Reiche Ader (6×) und Hauptader (25×) |
-| Craft / Bars | Schmelzofen: Erz → Barren → Grabkraft |
-| Floors | Zehn Schichten mit eigener Härte |
-| Obelisk | Wächter am Ende jeder Schicht |
-| Upgrades | Schmiede, an die Hackenstufe gekoppelt |
-| Sell | Gold pro Block |
-| Bombs | Sprengung (10 Blöcke) |
-| Offline | Echte Simulation statt Schätzung |
-| Prestige | Einsturz mit Seelenrunen |
+Das ist deshalb so wirksam, weil die Stufenobergrenze ein **harter Riegel** ist,
+den kein Grinden aufweicht. Und es gibt den Wächtern endlich eine Aufgabe: Sie
+sind der Torwächter des Fortschritts, nicht bloß ein Block mit viel HP.
 
-### Als Nächstes — jede Mechanik löst einen bestimmten Engpass
+Bei uns:
 
-Reihenfolge nach Nutzen, nicht nach Aufwand:
+| | |
+|---|---|
+| Erfahrung je Block | `1 + 2 × Schichtnummer` |
+| Stufe | aus der Gesamterfahrung, geschlossene Form |
+| Obergrenze | `15 + 6 × tiefster besiegter Wächter` |
+| Upgrade sichtbar ab | eigener `unlockLevel` je Upgrade (1, 3, 6, 8, 10, 12, 14, 16, 18) |
+| Ausbaustufe | eine je Spielerstufe ab der Freischaltung |
 
-1. **Contracts (Verträge)** — "Bring 500 Kupfer" gegen Kristalle. Gibt dem
-   Ausbeuten an der Wand ein zweites Ziel, damit Warten sich nach Aufgabe
-   anfühlt.
-2. **Chests + Relics (Truhen und Relikte)** — Wächter lassen Truhen fallen,
-   darin permanente Passiv-Boni. Der Grund, Wächter zu *wollen*.
-3. **Drones (Drohnen)** — Automatisierung: Ausbeuten ohne Zuschauen, Auto-Kauf.
-   Nimmt dem Spätspiel die Klickarbeit.
-4. **Skill-Tree** — ersetzt den flachen Runen-Multiplikator durch Entscheidungen.
-   Macht Prestige zur Wahl statt zur Rechenaufgabe.
-5. **Challenges (Herausforderungen)** — Läufe mit Handicap für permanente Boni.
-   Inhalt für alle, die die Kurve ausgereizt haben.
-6. **Lootbugs / Lootfrogs** — seltene Kreaturen, die durch den Stollen huschen
-   und angetippt werden wollen. Belohnt Hinschauen, ohne es zu erzwingen.
-7. **Pets, Cards, Workshop, Construct** — Sammel- und Set-Systeme fürs Spätspiel.
-8. **Stargazing, Archaeology, Fishing, Arcanist** — eigene Nebenaktivitäten,
-   sinnvoll erst wenn der Hauptloop über Wochen trägt.
+Das ersetzt die `perPick`-Klammer aus v0.2. Die war eine reine Notbremse gegen
+den zu schnellen Aufkauf und hatte keine Spielhandlung dahinter — jetzt hängt
+der Ausbau an etwas, das man sich erkämpft.
 
-Nicht übernommen: **Store** und **Codes** (keine Monetarisierung geplant) sowie
-**Cloud** (der Speicherstand wandert per Export/Import, ohne Konto).
+Beim Einsturz gehen Erfahrung und Stufe mit; **die Obergrenze bleibt**. Genau
+wie bei Obelisk Miner, wo der Obelisk-Rang permanent ist.
+
+## 12. Was aus dem Wiki noch aussteht
+
+Aus dem vollständigen Wiki (139 Seiten), sortiert nach Nutzen für unser Spiel.
+
+### Als Nächstes
+
+**1. Wächter als richtiger Kampf.** Das Original macht daraus ein Ereignis
+statt eines dicken Blocks:
+- **Rüstung** — zieht sich vom *Grundschaden je Schlag* ab, **vor** dem Krit.
+  Liegt der Grundschaden darunter, richtet man *gar nichts* aus, egal wie hoch
+  der Kritschaden wäre. Das belohnt wenige große Schläge statt vieler kleiner —
+  eine ganz andere Achse als unsere Härte, die nur den Schaden herunterskaliert.
+- **30 Sekunden Kampfzeit**, danach 20 Minuten Abklingzeit.
+- **Schaden bleibt über alle Versuche erhalten** — man beißt sich über Stunden
+  durch, statt in einem Anlauf gewinnen zu müssen.
+- Belohnung: Obergrenze +5, Kristalle, neue Mechanik.
+
+**2. Verträge** (Original: ab Obelisk 12). Verlangen **Barren**, nicht Erz —
+damit bekommt der Schmelzofen einen zweiten Abnehmer. Jeder erfüllte Vertrag
+gibt Vertragspunkte für einen eigenen Upgrade-Zweig; die Anforderungen steigen
+mit jedem Abschluss. Gibt dem Warten an der Härtewand ein zweites Ziel.
+
+**3. Truhen und Gegenstände.** Eine Leiste füllt sich mit ausgeteiltem Schaden
+(Anforderung wächst exponentiell, gedeckelt durch die Block-HP). Voll = Truhe =
+ein Gegenstand mit **zeitlich begrenztem Buff** (im Original 13 Stück, 1:30 bis
+2:30 min: Kritchance, Tempo, Schaden). Das ist der Vorbereitungs-Schritt vor
+einem Wächter-Kampf — und der Grund, überhaupt zuzuschauen.
+
+**4. Adern als eigene Dauerwährung.** Im Original sind Veins keine
+Erz-Multiplikatoren wie bei uns, sondern eine **Währung, die den Prestige
+überlebt**. Erz-Knoten werden mit einer gewissen Chance zu Adern-Knoten und
+geben dann beides. Damit gäbe es drei Ebenen statt zwei:
+Erz/Barren/Gold (Reset) — Adern/Kristalle/Runen (permanent).
+
+**5. Drohnen** — Automatisierung fürs Spätspiel. Im Original mit eigenem
+Treibstoff-Kreislauf (Kohle → Generator), also selbst wieder ein Engpass.
+
+### Später
+
+**Herausforderungen** (Läufe mit Handicap für permanente Boni) ·
+**Skill-Baum** · **Karten** mit Set-Boni · **Haustiere** ·
+**Sonderböden** (Golden ×5, Rainbow ×50, multiplikativ stapelbar) ·
+**Lootbugs** · **Statuen/Monumente**.
+
+### Bewusst nicht übernommen
+
+**Store**, **Codes** und **Events** — keine Monetarisierung und keine
+Live-Service-Infrastruktur geplant. **Cloud-Speicherstand** — bei uns wandert
+der Stand per Export/Import, ohne Konto. Die vier Nebenaktivitäten
+(**Stargazing**, **Archaeology**, **Fishing**, **Arcanist**) sind eigene
+Minispiele; sie lohnen erst, wenn der Hauptloop über Wochen trägt.

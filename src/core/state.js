@@ -2,7 +2,7 @@
 // Ein einziges JSON-Objekt in localStorage. Versioniert, damit spätere
 // Balance-/Feature-Änderungen alte Stände nicht zerschießen.
 
-import { blockMaxHp } from './balance.js';
+import { blockMaxHp, levelFromXp, levelCap } from './balance.js';
 
 // v2 hat eine komplett andere Wirtschaft (Erz, Härte, Hacken-Stufen).
 // Ein v1-Stand liesse sich zwar technisch weiterschreiben, waere aber sofort
@@ -22,6 +22,10 @@ export function createState() {
     vein: 'normal',
     bossesDown: {},
     mode: 'dig', // 'dig' = vortreiben, 'farm' = ausbeuten
+
+    xp: 0,
+    level: 1,
+    obelisk: 0, // tiefster je besiegter Waechter — ueberlebt den Einsturz
 
     gold: 0,
     crystals: 0,
@@ -97,7 +101,7 @@ function migrate(data) {
   state.log = Array.isArray(data.log) ? data.log.slice(-40) : [];
 
   // Plausibilität: kaputte/fehlende Zahlen abfangen.
-  for (const key of ['depth', 'maxDepth', 'gold', 'crystals', 'runes', 'bars', 'blockHp']) {
+  for (const key of ['depth', 'maxDepth', 'gold', 'crystals', 'runes', 'bars', 'blockHp', 'xp', 'obelisk']) {
     if (typeof state[key] !== 'number' || !isFinite(state[key]) || state[key] < 0) {
       state[key] = fresh[key];
     }
@@ -107,6 +111,8 @@ function migrate(data) {
     if (typeof v !== 'number' || !isFinite(v) || v < 0) delete state.ores[id];
   }
   state.pickTier = Math.max(1, Math.floor(state.pickTier) || 1);
+  state.obelisk = Math.floor(state.obelisk);
+  state.level = levelFromXp(state.xp, levelCap(state));
   state.depth = Math.floor(state.depth);
   state.maxDepth = Math.max(state.maxDepth, state.depth);
   if (state.mode !== 'farm') state.mode = 'dig';

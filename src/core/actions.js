@@ -77,7 +77,7 @@ export function buyForge(state, id, amount = 1) {
   let bought = 0;
   let level = state.upgrades[id] || 0;
   const limit = amount === 'max' ? 500 : amount;
-  const cap = forgeMaxLevel(def, state);
+  const cap = forgeMaxLevel(def, state, state.level);
 
   while (bought < limit && level < cap) {
     const cost = forgeCost(id, level);
@@ -88,7 +88,7 @@ export function buyForge(state, id, amount = 1) {
   }
   if (bought === 0) {
     if (level >= def.max) return fail('Maximalstufe erreicht');
-    if (level >= cap) return fail('Braucht erst eine bessere Spitzhacke');
+    if (level >= cap) return fail('Braucht eine höhere Spielerstufe');
     return fail('Zu wenig Gold');
   }
   state.upgrades[id] = level;
@@ -181,6 +181,9 @@ export function collapse(state) {
   // Der ganze Lauf geht: Gold, Zwerge, Schmiede, Erz, Barren und die Hacke.
   // Die Runen machen den zweiten Durchgang so viel schneller, dass sich das
   // Nachschmieden wie Fortschritt anfuehlt und nicht wie Strafe.
+  // Erfahrung und Stufe gehen mit — die Obergrenze (state.obelisk) bleibt.
+  state.xp = 0;
+  state.level = 1;
   state.gold = 0;
   state.miners = {};
   state.upgrades = {};

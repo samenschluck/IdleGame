@@ -4,7 +4,9 @@
 
 import { fmt, fmtInt, fmtTime, fmtDepth } from '../util/format.js';
 import { MINERS } from '../data/miners.js';
-import { FORGE_UPGRADES, CRYSTAL_UPGRADES, CRYSTAL_ACTIONS, forgeMaxLevel } from '../data/upgrades.js';
+import {
+  FORGE_UPGRADES, CRYSTAL_UPGRADES, CRYSTAL_ACTIONS, forgeMaxLevel, forgeUnlocked,
+} from '../data/upgrades.js';
 import { LAYERS, layerIndexAt, layerAt, isBossDepth, bossNameAt, ORE_BY_ID } from '../data/layers.js';
 import { PICKS, pickAt, nextPick } from '../data/picks.js';
 import * as B from '../core/balance.js';
@@ -28,7 +30,7 @@ export function initUI(gameState, handlers) {
 
   for (const id of [
     'res-gold', 'res-crystals', 'res-runes', 'hud-layer', 'hud-dps', 'hud-pick',
-    'boost-bar', 'boost-time', 'depth-value', 'depth-max', 'block',
+    'boost-bar', 'boost-time', 'level-num', 'level-fill', 'level-cap', 'depth-value', 'depth-max', 'block',
     'block-name', 'block-face', 'block-hp', 'block-vein', 'hpbar-fill', 'floaters',
     'hardness-warn', 'hardness-text', 'mode-row', 'mode-seg', 'mode-hint', 'ore-strip',
     'log', 'miner-list', 'forge-list', 'crystal-list', 'action-list',
@@ -48,7 +50,7 @@ export function initUI(gameState, handlers) {
   bindPrestige();
   bindSaveRow();
 
-  el['version-line'].textContent = 'Tiefenschacht v0.2 — Erz, Härte, Schmelzofen';
+  el['version-line'].textContent = 'Tiefenschacht v0.3 — Stufen, Erz, Härte, Schmelzofen';
   renderSlow();
 }
 
@@ -230,6 +232,13 @@ export function renderFast(now = Date.now()) {
   el['hud-pick'].textContent = `${pick.icon} ${pick.name}`;
   el['hud-dps'].textContent = fmt(B.totalDps(state, now)) + '/s';
   document.documentElement.style.setProperty('--layer', layer.tint);
+
+  const lvl = B.levelProgress(state);
+  el['level-num'].textContent = 'Stufe ' + lvl.level;
+  el['level-cap'].textContent = '/ ' + lvl.cap;
+  el['level-fill'].style.width = (lvl.pct * 100).toFixed(1) + '%';
+  el['level-fill'].classList.toggle('capped', lvl.capped);
+  el['level-cap'].classList.toggle('capped', lvl.capped);
 
   const boostLeft = state.boostUntil - now;
   el['boost-bar'].classList.toggle('hidden', boostLeft <= 0);
@@ -460,10 +469,10 @@ function renderSmelter() {
 
 function renderForgeUpgrades() {
   el['forge-list'].innerHTML = FORGE_UPGRADES.filter(
-    (u) => !u.feature || state.features[u.feature]
+    (u) => (!u.feature || state.features[u.feature]) && forgeUnlocked(u, state.level)
   ).map((u) => {
     const level = state.upgrades[u.id] || 0;
-    const cap = forgeMaxLevel(u, state);
+    const cap = forgeMaxLevel(u, state, state.level);
     const maxed = level >= u.max;
     const gated = !maxed && level >= cap; // wartet auf eine bessere Hacke
     const cost = maxed || gated ? Infinity : B.forgeCost(u.id, level);
@@ -473,7 +482,7 @@ function renderForgeUpgrades() {
       icon: u.icon,
       title: `${u.name} <span class="card-count">Stufe ${level}${cap < u.max ? ' / ' + cap : ''}</span>`,
       desc: u.desc,
-      effect: gated ? 'Braucht eine bessere Spitzhacke' : forgeEffect(u.id, level),
+      effect: gated ? `Frei ab Stufe ${level + (u.unlockLevel || 1)}` : forgeEffect(u.id, level),
       cost: maxed ? 'MAX' : gated ? '🔒' : `🪙 ${fmt(cost)}`,
       disabled: maxed || gated || !affordable,
       cls: !maxed && !gated && affordable ? 'affordable' : '',
@@ -554,6 +563,7 @@ function renderDeep() {
     ['Adern getroffen', fmtInt(s.veins)],
     ['Hacken geschmiedet', fmtInt(s.picksForged)],
     ['Wächter besiegt', fmtInt(s.bossesSlain)],
+    ['Stufenobergrenze', fmtInt(B.levelCap(state))],
     ['Geoden gefunden', fmtInt(s.geodes)],
     ['Kristalle gesamt', fmtInt(s.crystalsEarned)],
     ['Einstürze', fmtInt(s.collapses)],

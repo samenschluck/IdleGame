@@ -17,6 +17,9 @@ import {
   rollVein,
   hardnessShortfall,
   smeltRate,
+  xpPerBlock,
+  levelFromXp,
+  levelCap,
   ORE_PER_BAR,
   VEINS,
 } from './balance.js';
@@ -91,6 +94,16 @@ function breakBlock(state, ctx) {
   state.stats.blocksBroken++;
   ctx.gold += gold;
 
+  // Erfahrung. Die Stufe wird daraus abgeleitet und bleibt an der Obergrenze
+  // stehen, bis der naechste Waechter faellt.
+  const before = state.level;
+  state.xp += xpPerBlock(depth);
+  state.level = levelFromXp(state.xp, levelCap(state));
+  if (state.level > before) {
+    ctx.levelUp = state.level;
+    if (!ctx.quiet) ctx.events.push({ type: 'level', level: state.level });
+  }
+
   // Erz der aktuellen Schicht.
   addOre(state, layerAt(depth).ore.id, oreYield(state, vein.mult), ctx);
   if (vein.mult > 1) {
@@ -103,6 +116,15 @@ function breakBlock(state, ctx) {
 
   if (boss) {
     state.bossesDown[depth] = true;
+    // Der Rang steigt nur bei einem NEUEN, tieferen Waechter — sonst haette
+    // ein Einsturz plus Wiederholung derselben Kaempfe die Obergrenze beliebig
+    // hochgeschraubt.
+    const rank = layerIndexAt(Math.max(0, depth - 1)) + 1;
+    if (rank > state.obelisk) {
+      state.obelisk = rank;
+      pushLog(state, `Stufenobergrenze steigt auf ${levelCap(state)}`, 'unlock');
+      if (!ctx.quiet) ctx.events.push({ type: 'levelcap', cap: levelCap(state) });
+    }
     const crystals = bossCrystals(depth);
     addCrystals(state, crystals, ctx);
     state.stats.bossesSlain++;
